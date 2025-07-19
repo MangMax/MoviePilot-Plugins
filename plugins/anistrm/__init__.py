@@ -53,19 +53,19 @@ def retry(ExceptionToCheck: Any,
 
 class ANiStrm(_PluginBase):
     # 插件名称
-    plugin_name = "ANiStrm"
+    plugin_name = "ANiStrm Plus"
     # 插件描述
     plugin_desc = "自动获取当季所有番剧，免去下载，轻松拥有一个番剧媒体库"
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/honue/MoviePilot-Plugins/main/icons/anistrm.png"
     # 插件版本
-    plugin_version = "2.4.2"
+    plugin_version = "2.4.4"
     # 插件作者
-    plugin_author = "honue"
+    plugin_author = "honue - mang"
     # 作者主页
-    author_url = "https://github.com/honue"
+    author_url = "https://github.com/MangMax"
     # 插件配置项ID前缀
-    plugin_config_prefix = "anistrm_"
+    plugin_config_prefix = "anistrm_plus_"
     # 加载顺序
     plugin_order = 15
     # 可使用的用户级别
@@ -168,7 +168,11 @@ class ANiStrm(_PluginBase):
         if not file_url:
             # 季度API生成的URL，使用新格式
             encoded_filename = quote(file_name, safe='')
-            src_url = f'https://{self._custom_domain}/{self._date}/{encoded_filename}.mp4?d=true'
+            # 检查encoded_filename是否已经包含.mp4后缀
+            if not encoded_filename.endswith('.mp4'):
+                src_url = f'https://{self._custom_domain}/{self._date}/{encoded_filename}.mp4?d=true'
+            else:
+                src_url = f'https://{self._custom_domain}/{self._date}/{encoded_filename}?d=true'
         else:
             # 检查API获取的URL格式是否符合要求
             if self._is_url_format_valid(file_url):
