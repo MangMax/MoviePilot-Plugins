@@ -14,6 +14,7 @@ from app.log import logger
 import xml.dom.minidom
 from app.utils.dom import DomUtils
 from urllib.parse import quote
+from opencc import OpenCC
 
 
 def retry(ExceptionToCheck: Any,
@@ -79,6 +80,8 @@ class ANiStrm(_PluginBase):
     _fulladd = False
     _storageplace = None
     _custom_domain = None
+    _convert_traditional = False
+    _opencc = OpenCC('t2s')
 
     # 定时器
     _scheduler: Optional[BackgroundScheduler] = None
@@ -94,6 +97,7 @@ class ANiStrm(_PluginBase):
             self._fulladd = config.get("fulladd")
             self._storageplace = config.get("storageplace")
             self._custom_domain = config.get("custom_domain") or "openani.an-i.workers.dev"
+            self._convert_traditional = config.get("convert_traditional", False)
             # 加载模块
         if self._enabled or self._onlyonce:
             # 定时服务
@@ -132,6 +136,11 @@ class ANiStrm(_PluginBase):
                 self._date = f'{current_year}-{month}'
                 return f'{current_year}-{month}'
 
+    def _convert_title(self, title: str) -> str:
+        if self._convert_traditional:
+            return self._opencc.convert(title)
+        return title
+
     @retry(Exception, tries=3, logger=logger, ret=[])
     def get_current_season_list(self) -> List:
         url = f'https://{self._custom_domain}/{self.__get_ani_season()}/'
@@ -140,7 +149,7 @@ class ANiStrm(_PluginBase):
                            proxies=settings.PROXY if settings.PROXY else None).post(url=url)
         logger.debug(rep.text)
         files_json = rep.json()['files']
-        return [file['name'] for file in files_json]
+        return [self._convert_title(file['name']) for file in files_json]
 
     @retry(Exception, tries=3, logger=logger, ret=[])
     def get_latest_list(self) -> List:
@@ -159,12 +168,13 @@ class ANiStrm(_PluginBase):
             title = DomUtils.tag_value(item, "title", default="")
             # 链接
             link = DomUtils.tag_value(item, "link", default="")
-            rss_info['title'] = title
+            rss_info['title'] = self._convert_title(title)
             rss_info['link'] = link.replace("resources.ani.rip", self._custom_domain)
             ret_array.append(rss_info)
         return ret_array
 
     def __touch_strm_file(self, file_name, file_url: str = None) -> bool:
+        file_name = self._convert_title(file_name)
         if not file_url:
             # 季度API生成的URL，使用新格式
             encoded_filename = quote(file_name, safe='')
@@ -366,6 +376,13 @@ class ANiStrm(_PluginBase):
                                 },
                                 'content': [
                                     {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'convert_traditional',
+                                            'label': '繁体转简体',
+                                        }
+                                    },
+                                    {
                                         'component': 'VAlert',
                                         'props': {
                                             'type': 'info',
@@ -399,6 +416,7 @@ class ANiStrm(_PluginBase):
             "storageplace": '/downloads/strm',
             "cron": "*/20 22,23,0,1 * * *",
             "custom_domain": "openani.an-i.workers.dev",
+            "convert_traditional": False,
         }
 
     def __update_config(self):
@@ -409,6 +427,7 @@ class ANiStrm(_PluginBase):
             "fulladd": self._fulladd,
             "storageplace": self._storageplace,
             "custom_domain": self._custom_domain,
+            "convert_traditional": self._convert_traditional,
         })
 
     def get_page(self) -> List[dict]:
